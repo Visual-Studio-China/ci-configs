@@ -1,3 +1,3 @@
-# ci-configs
+# ci-scripts
 
-Repos of appveyoy.yml files.
+Scripts to do CI.
