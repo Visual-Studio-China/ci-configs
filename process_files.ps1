@@ -44,7 +44,7 @@ $script_block =
   $new_header = set_metadata $header $new_header 'ms.date' (Get-Date $date -format d) $true
   
   cd $root_path
-  $file_rel_path = gi $file | rvpa -Relative
+  $file_rel_path = $file.SubString(0, $file.IndexOf($global:root_name))
   $git_prefix = 'https://github.com/' + $repo_name + '/blob/'
   $content_git_url = (New-Object System.Uri ($git_prefix + $branch + '/' + $file_rel_path)).AbsoluteUri
   $new_header = set_metadata $header $new_header 'content_git_url' $content_git_url  $true

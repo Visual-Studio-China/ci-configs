@@ -35,7 +35,8 @@ function global:DoGetToc($folder_path, $level)
   $index = ls $folder_path | ? {$_.Name -eq 'index.md'} | select -ExpandProperty FullName
   if($index -ne $null)
   {
-    ac $toc_path ($pre + "  href: " + (gi $index | rvpa -Relative).replace('\' + $root_name, '.'))
+    $index -match ".*$root_name"
+    ac $toc_path ($pre + "  href: " + $index.replace($matches[0], '..'))
   }
   
   $sub_folders = ls $folder_path -Directory
@@ -48,7 +49,8 @@ function global:DoGetToc($folder_path, $level)
       $found = (gc $file | Out-String) -match '^(?s)\s*[-]{3}(.*?)[-]{3}\r?\n'
       if($found -and $matches[1] -match 'Module Name')
       {
-        ac $toc_path ($pre + "  href: " + (gi $file | rvpa -Relative).replace('\' + $root_name, '.'))
+        $file -match ".*$root_name"
+        ac $toc_path ($pre + "  href: " + $file.replace($matches[0], '..'))
         $landing_page = $file
         break
       }
@@ -60,8 +62,9 @@ function global:DoGetToc($folder_path, $level)
     {
       if($file -ne $landing_page)
       {
+        $file -match ".*$root_name"
         ac $toc_path ($pre + "- name: " + (gi $file).BaseName)
-        ac $toc_path ($pre + "  href: " + (gi $file | rvpa -Relative).replace('\' + $root_name, '.'))
+        ac $toc_path ($pre + "  href: " + $file.replace($matches[0], '..'))
       }
     }
   }
