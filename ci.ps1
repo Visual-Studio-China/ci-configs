@@ -8,7 +8,7 @@ $files = ls $global:root_path -Recurse | ? {$_.extension -eq '.md'} | % { $_.Ful
 
 $script_block =
 {
-  param($file)
+  param($file, $root_name)
   $pattern = '^(?s)\s*[-]{3}(.*?)[-]{3}\r?\n'
   
   function set_metadata ($header, $new_header, $key, $value, $overwrite)
@@ -38,7 +38,7 @@ $script_block =
   $new_header = set_metadata $header $new_header 'updated_at' (Get-Date $date -format g) $true
   $new_header = set_metadata $header $new_header 'ms.date' (Get-Date $date -format d) $true
 
-  $file_rel_path = $file -replace ".*$global:root_name", ""
+  $file_rel_path = $file -replace ".*$root_name", "/$root_name"
   $git_prefix = 'https://github.com/' + $env:APPVEYOR_REPO_NAME + '/blob/'
   $content_git_url = (New-Object System.Uri ($git_prefix + $env:APPVEYOR_REPO_BRANCH + $file_rel_path)).AbsoluteUri
   $new_header = set_metadata $header $new_header 'content_git_url' $content_git_url  $true
@@ -69,7 +69,7 @@ $RunspacePool = [RunspaceFactory ]::CreateRunspacePool(1, $MaxThreads)
 $RunspacePool.Open()
 $Jobs = @()
 $files | % {
-  $Job = [powershell]::Create().AddScript($script_block).AddArgument($_)
+  $Job = [powershell]::Create().AddScript($script_block).AddArgument($_).AddArgument($global:root_name)
   $Job.RunspacePool = $RunspacePool
   $Jobs += New-Object PSObject -Property @{
     RunNum = $_
