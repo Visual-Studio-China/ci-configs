@@ -1,22 +1,16 @@
-param(
-    [string]$root_path,
-    [string]$root_name,
-    [string]$target
-)
-
 # overwrite filds but not delete modules due to multiple repos input
-foreach($folder in (ls $root_path -Directory))
+foreach($folder in (ls $global:root_path -Directory))
 {
   $folder_name = Split-Path $folder.FullName -Leaf
-  $target = Join-Path $target $folder_name
+  $target = Join-Path $env:TEMP\Azure $env:target_folder\$folder_name
   if(Test-Path $target)
   {
     rm $target -Recurse -Force
   }
-  copy $folder.FullName $target -recurse -Force
+  Copy-Item $folder.FullName $target -recurse -Force
 }
 
-$toc_folder = Join-Path $target $root_name
+$toc_folder = Join-Path $env:TEMP\Azure $env:target_folder\$global:root_name
 if(Test-Path $toc_folder)
 {
   rm $toc_folder -Recurse -Force
@@ -24,28 +18,28 @@ if(Test-Path $toc_folder)
 
 # copy project toc
 ni $toc_folder -type Directory
-$toc = Join-Path $toc_folder 'toc.yml'
-copy (Join-Path $root_path "toc.yml") $toc_folder
+$toc = Join-Path $toc_folder "toc.yml"
+Copy-item (Join-Path $global:root_path "toc.yml") $toc_folder
 
 # copy project index
-$index = Join-Path $root_path "index.md"
+$index = Join-Path $global:root_path "index.md"
 if(Test-Path $index)
 {
-  copy $index $toc_folder
+  Copy-item $index $toc_folder
 }
 
 # add content to global toc
-$global_toc = $target\toc.yml
+$global_toc = Join-Path $env:TEMP\Azure $env:target_folder\toc.yml
 if(!(Test-Path $global_toc))
 {
   ni $global_toc
 }
-if(!((gc $global_toc | Out-String) -match $root_name))
+if(!((gc $global_toc | Out-String) -match $global:root_name))
 {
-  ac $global_toc ("- name: " + $root_name)
+  ac $global_toc ("- name: " + $global:root_name)
   if(Test-Path $index)
   {
-    ac $global_toc ("  href: " + $root_name + "/index.md")
+    ac $global_toc ("  href: " + $global:root_name + "/index.md")
   }
-  ac $global_toc ("  tocHref: " + $root_name + "/toc.yml")
+  ac $global_toc ("  tocHref: " + $global:root_name + "/toc.yml")
 }
