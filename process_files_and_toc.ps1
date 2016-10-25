@@ -64,7 +64,7 @@ $script_block =
   sc $file (gc $file | Out-String).replace($header, $new_header) -NoNewline
 }
 
-$MaxThreads = 8
+$MaxThreads = 10
 $RunspacePool = [RunspaceFactory ]::CreateRunspacePool(1, $MaxThreads)
 $RunspacePool.Open()
 $Jobs = @()
