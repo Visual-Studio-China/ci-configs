@@ -57,6 +57,7 @@ $script_block =
   $new_header = set_metadata $header $new_header 'ms.service' $env:service
   $new_header = set_metadata $header $new_header 'ms.technology' $env:technology
   $new_header = set_metadata $header $new_header 'author' $env:author
+  $new_header = set_metadata $header $new_header 'ms.author' ${env:ms.author}
   $new_header = set_metadata $header $new_header 'keywords' $env:keywords
   $new_header = set_metadata $header $new_header 'manager' $env:manager
   $new_header = $new_header.replace('{{', '').replace('}}', '')
