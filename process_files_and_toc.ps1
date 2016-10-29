@@ -1,17 +1,14 @@
-if((ls $env:APPVEYOR_BUILD_FOLDER -Directory).count -ne 1)
+if((ls $env:APPVEYOR_BUILD_FOLDER -dir).count -ne 1)
 {
   $host.SetShouldExit(-1)
 }
-
-Write-Host "Begin processing files"
-$files = ls $global:root_path -Recurse | ? {$_.extension -eq '.md'} | % { $_.FullName }
+$pattern = "^(?s)\s*[-]{3}(.*?)[-]{3}\r?\n"
 
 $script_block =
 {
-  param($file, $root_name)
-  $pattern = '^(?s)\s*[-]{3}(.*?)[-]{3}\r?\n'
-  
-  function set_metadata ($header, $new_header, $key, $value, $overwrite)
+  param($file, $root_name, $pattern)
+
+  function set_metadata($header, $new_header, $key, $value, $overwrite)
   {
     if($header -match "$key[\s\S].*" -and $overwrite -eq $true)
     {
@@ -23,22 +20,18 @@ $script_block =
     }
     return $new_header
   }
-  
-  if((gc $file | Out-String) -notmatch $pattern)
-  {
-    continue
-  }
-  
+
+  # set or update metadata
+  (gc $file | Out-String) -match $pattern | Out-Null
   $header = $matches[1]
   $new_header = $matches[1]
   cd $env:APPVEYOR_BUILD_FOLDER
 
-  # set or update metadata
   $date = (Get-Date (git log --pretty=format:%cd -n 1 --date=iso $file)).ToUniversalTime()
   $new_header = set_metadata $header $new_header 'updated_at' (Get-Date $date -format g) $true
   $new_header = set_metadata $header $new_header 'ms.date' (Get-Date $date -format d) $true
 
-  $file_rel_path = $file -replace ".*$root_name", "/$root_name"
+  $file_rel_path = $file -replace ".*$root_name", "/$root_name" -replace "\\", "/"
   $git_prefix = 'https://github.com/' + $env:APPVEYOR_REPO_NAME + '/blob/'
   $content_git_url = (New-Object System.Uri ($git_prefix + $env:APPVEYOR_REPO_BRANCH + $file_rel_path)).AbsoluteUri
   $new_header = set_metadata $header $new_header 'content_git_url' $content_git_url  $true
@@ -47,7 +40,7 @@ $script_block =
   $new_header = set_metadata $header $new_header 'gitcommit' $git_commit_url  $true
 
   $topic_type = 'reference'
-  if($header -match 'Module Name')
+  if($header -match 'Module\s*Name\s*:')
   {
     $topic_type = 'conceptual'
   }
@@ -60,17 +53,27 @@ $script_block =
   $new_header = set_metadata $header $new_header 'ms.author' ${env:ms.author}
   $new_header = set_metadata $header $new_header 'keywords' $env:keywords
   $new_header = set_metadata $header $new_header 'manager' $env:manager
-  $new_header = $new_header.replace('{{', '').replace('}}', '')
+  sc $file (gc $file | Out-String).replace($header, ($new_header -replace "{|}", "")) -NoNewline
 
-  sc $file (gc $file | Out-String).replace($header, $new_header) -NoNewline
+  # resolve related links
+  if((gc $file | Out-String) -match "#*\s*RELATED\s*LINKS\s*(.|\n)*")
+  {
+    $related_links = $matches[0]
+    $new_related_links = $matches[0]
+    $related_links | sls "\[\S.*\]\(.*\)" -AllMatches | % matches | ? {$_ -match ".md\s*\)" -and $_ -notmatch "xref:"} | % {
+      $value = "(xref:" + $file_rel_path.Substring(1, $file_rel_path.LastIndexOf('/'))
+      $new_related_links = $new_related_links.replace($_, ($_ -replace "\([^a-z]*", $value -replace "/*$root_name/*",""))
+    }
+    sc $file (gc $file | Out-String).replace($related_links, $new_related_links) -NoNewline
+  }
 }
-
-$MaxThreads = 10
+$MaxThreads = 8
 $RunspacePool = [RunspaceFactory ]::CreateRunspacePool(1, $MaxThreads)
 $RunspacePool.Open()
 $Jobs = @()
+$files = ls $global:root_path -r | ? {$_.extension -eq '.md' -and (gc $_.FullName | Out-String) -match $pattern} | % { $_.FullName }
 $files | % {
-  $Job = [powershell]::Create().AddScript($script_block).AddArgument($_).AddArgument($global:root_name)
+  $Job = [powershell]::Create().AddScript($script_block).AddArgument($_).AddArgument($global:root_name).AddArgument($pattern)
   $Job.RunspacePool = $RunspacePool
   $Jobs += New-Object PSObject -Property @{
     RunNum = $_
@@ -78,8 +81,7 @@ $files | % {
     Result = $Job.BeginInvoke()
   }
 }
-    
-Write-Host "Waiting..."
+Write-Host "Process files..."
 Do
 {
   Start-Sleep -Seconds 1
@@ -87,25 +89,17 @@ Do
 Write-Host "Processing files completed!"
 
 # generate toc
-function GetToc
+function get_toc
 {
   if(Test-Path $toc_path)
   {
     rm $toc_path
   }
   ni $toc_path
-  Write-Host "constructing toc..."
-  
-  foreach($subFolder in (ls $global:root_path -Directory))
-  {
-    DoGetToc $subFolder.FullName 0
-  }
-  
-  sc $toc_path (gc $toc_path | Out-String).replace('\', '/') -NoNewline
-  Write-Host "constructing toc completed."
+  ls $global:root_path -dir | % {do_get_toc $_.FullName 0} 
+  sc $toc_path (gc $toc_path | Out-String).replace("\", "/") -NoNewline
 }
-
-function global:DoGetToc($folder_path, $level)
+function global:do_get_toc($folder_path, $level)
 {
   $pre = ""
 
@@ -121,45 +115,33 @@ function global:DoGetToc($folder_path, $level)
     ac $toc_path ($pre + "  href: " + ($index -replace ".*$global:root_name", ".."))
   }
   
-  $sub_folders = ls $folder_path -Directory
+  $sub_folders = ls $folder_path -dir
   if($sub_folders -eq $null)
   {
     $files = (ls $folder_path) | ? { $_.Extension -eq '.md' } | select -ExpandProperty FullName
     $landing_page = ""
-    foreach($file in $files)
-    {
-      $found = (gc $file | Out-String) -match '^(?s)\s*[-]{3}(.*?)[-]{3}\r?\n'
-      if($found -and $matches[1] -match 'Module Name')
-      {
-        ac $toc_path ($pre + "  href: " + ($file -replace ".*$global:root_name", ".."))
-        $landing_page = $file
-        break
-      }
+    $files | ? {(gc $_ | Out-String) -match $pattern -and $matches[1] -match 'Module\s*Name\s*:'} | select -First 1 | % {
+      ac $toc_path ($pre + "  href: " + ($_ -replace ".*$global:root_name", ".."))
+      $landing_page = $_
     }
 
     ac $toc_path ($pre + "  items:")
     $pre = $pre + "    "
-    foreach($file in $files)
-    {
-      if($file -ne $landing_page)
-      {
-        ac $toc_path ($pre + "- name: " + (gi $file).BaseName)
-        ac $toc_path ($pre + "  href: " + ($file -replace ".*$global:root_name", ".."))
-      }
+    $files | ? {$_ -ne $landing_page} | % {
+      ac $toc_path ($pre + "- name: " + (gi $_).BaseName + "`r`n" + $pre + "  href: " + ($_ -replace ".*$global:root_name", ".."))
     }
   }
   else
   {
     ac $toc_path ($pre + "  items:")
-    if($sub_folders[0].Name -match 'v\d(.\d)*')
+    if(($sub_folders | select -First 1).Name -match 'v\d(.\d)*')
     {
-      $sub_folders = $sub_folders | Sort-Object -Property Name -Descending
+      $sub_folders = $sub_folders | sort -Property Name -Descending
     }
-    foreach($sub_folder in $sub_folders)
-    {
-      DoGetToc $sub_folder.FullName ($level+1)
-    }
+    $sub_folders | % {do_get_toc $_.FullName ($level + 1)}
   }
 }
 
-GetToc
+Write-Host "constructing toc..."
+get_toc
+Write-Host "constructing toc completed."
