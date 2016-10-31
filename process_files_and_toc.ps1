@@ -14,11 +14,12 @@ $script_block =
 
   function set_metadata($header, $new_header, $key, $value, $overwrite)
   {
-    if($header -match "$key[\s\S].*" -and $overwrite -eq $true)
+    $meta = "(?m)^$key\s*:[\s\S].*"
+    if($header -match $meta -and $overwrite -eq $true)
     {
       $new_header = $new_header.replace($matches[0], $key + ': ' + $value)
     }
-    if($header -notmatch "$key[\s\S].*")
+    if($header -notmatch $meta)
     {
       $new_header = $new_header + $key + ': ' + $value + "`r`n"
     }
