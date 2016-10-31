@@ -1,3 +1,7 @@
+# 1. read the file, set or update the metadata
+# 2. resolve related links to format [related link](xref:uid)
+# 3. generate toc
+
 if((ls $env:APPVEYOR_BUILD_FOLDER -dir).count -ne 1)
 {
   $host.SetShouldExit(-1)
@@ -21,7 +25,6 @@ $script_block =
     return $new_header
   }
 
-  # set or update metadata
   (gc $file | Out-String) -match $pattern | Out-Null
   $header = $matches[1]
   $new_header = $matches[1]
@@ -55,7 +58,6 @@ $script_block =
   $new_header = set_metadata $header $new_header 'manager' $env:manager
   sc $file (gc $file | Out-String).replace($header, ($new_header -replace "{|}", "")) -NoNewline
 
-  # resolve related links
   if((gc $file | Out-String) -match "#*\s*RELATED\s*LINKS\s*(.|\n)*")
   {
     $related_links = $matches[0]
@@ -67,28 +69,6 @@ $script_block =
     sc $file (gc $file | Out-String).replace($related_links, $new_related_links) -NoNewline
   }
 }
-$MaxThreads = 8
-$RunspacePool = [RunspaceFactory ]::CreateRunspacePool(1, $MaxThreads)
-$RunspacePool.Open()
-$Jobs = @()
-$files = ls $global:root_path -r | ? {$_.extension -eq '.md' -and (gc $_.FullName | Out-String) -match $pattern} | % { $_.FullName }
-$files | % {
-  $Job = [powershell]::Create().AddScript($script_block).AddArgument($_).AddArgument($global:root_name).AddArgument($pattern)
-  $Job.RunspacePool = $RunspacePool
-  $Jobs += New-Object PSObject -Property @{
-    RunNum = $_
-    Pipe = $Job
-    Result = $Job.BeginInvoke()
-  }
-}
-Write-Host "Process files..."
-Do
-{
-  Start-Sleep -Seconds 1
-} While ($Jobs.Result.IsCompleted -contains $false)
-Write-Host "Processing files completed!"
-
-# generate toc
 function get_toc
 {
   if(Test-Path $toc_path)
@@ -141,6 +121,27 @@ function global:do_get_toc($folder_path, $level)
     $sub_folders | % {do_get_toc $_.FullName ($level + 1)}
   }
 }
+
+$MaxThreads = 8
+$RunspacePool = [RunspaceFactory ]::CreateRunspacePool(1, $MaxThreads)
+$RunspacePool.Open()
+$Jobs = @()
+$files = ls $global:root_path -r | ? {$_.extension -eq '.md' -and (gc $_.FullName | Out-String) -match $pattern} | % { $_.FullName }
+$files | % {
+  $Job = [powershell]::Create().AddScript($script_block).AddArgument($_).AddArgument($global:root_name).AddArgument($pattern)
+  $Job.RunspacePool = $RunspacePool
+  $Jobs += New-Object PSObject -Property @{
+    RunNum = $_
+    Pipe = $Job
+    Result = $Job.BeginInvoke()
+  }
+}
+Write-Host "Processing files..."
+Do
+{
+  sleep -Seconds 1
+} While ($Jobs.Result.IsCompleted -contains $false)
+Write-Host "Process files completed!"
 
 Write-Host "constructing toc..."
 get_toc

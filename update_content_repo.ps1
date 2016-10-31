@@ -1,42 +1,35 @@
-$ErrorActionPreference = 'Stop'
+# 1. copy docs to processing repo
+# 2. copy toc and index if there is any
+# 3. update global toc and breadcrumb if necessary
 
-# overwrite filds but not delete modules due to multiple repos input
-foreach($folder in (ls $global:root_path -Directory))
-{
-  $folder_name = Split-Path $folder.FullName -Leaf
-  $target = Join-Path $env:TEMP\Azure $env:target_folder\$folder_name
+$ErrorActionPreference = 'Stop'
+ls $global:root_path -dir | % {
+  $target = Join-Path $env:TEMP\Azure $env:target_folder | Join-Path -ChildPath (Split-Path $_.FullName -Leaf)
   if(Test-Path $target)
   {
     rm $target -Recurse -Force
   }
-  copy $folder.FullName $target -recurse -Force
+  copy $_.FullName $target -Recurse -Force
 }
 
 $toc_folder = Join-Path $env:TEMP\Azure $env:target_folder\$global:root_name
-if(Test-Path $toc_folder)
+if(!(Test-Path $toc_folder))
 {
-  rm $toc_folder -Recurse -Force
+  ni $toc_folder -type Directory
 }
 
-# copy project toc
-ni $toc_folder -type Directory
-$toc = Join-Path $toc_folder "toc.yml"
 copy (Join-Path $global:root_path "toc.yml") $toc_folder
-
-# copy project index
 $index = Join-Path $global:root_path "index.md"
 if(Test-Path $index)
 {
   copy $index $toc_folder
 }
-
-# add content to global toc
 $global_toc = Join-Path $env:TEMP\Azure $env:target_folder\toc.yml
 if(!(Test-Path $global_toc))
 {
   ni $global_toc
 }
-if(!((gc $global_toc | Out-String) -match $global:root_name))
+if((gc $global_toc | Out-String) -notmatch $global:root_name)
 {
   ac $global_toc ("- name: " + $global:root_name)
   if(Test-Path $index)
@@ -45,30 +38,20 @@ if(!((gc $global_toc | Out-String) -match $global:root_name))
   }
   ac $global_toc ("  tocHref: " + $global:root_name + "/toc.yml")
 }
-
-# update breadcrumb
 $breadcrumb_path = Join-Path $env:TEMP\Azure $env:target_folder\breadcrumb.json
 $breadcrumb = (gc -Raw $breadcrumb_path) | ConvertFrom-Json
 $children = $breadcrumb.children
 if($children -ne $null)
 {
   $new_node = $true
-  foreach($c in $children.children)
-  {
-    if($c.href -match $global:root_name)
-    {
-      $new_node = $false
-      break
-    }
-  }
+  $children.children | ? {$_.href -match $global:root_name} | select -First 1 | % {$new_node = $false}
   if($new_node)
   {
-    Write-Host 'update breadcrumb...'
     $new_child = New-Object PSObject -Property @{
-    href = $children[0].href + $global:root_name + "/"
-    homepage = $children[0].href + $global:root_name + "/"
-    toc_title = $global:root_name
-    level = 3
+      href = $children[0].href + $global:root_name + "/"
+      homepage = $children[0].href + $global:root_name + "/"
+      toc_title = $global:root_name
+      level = 3
     }
     
     if($children.children -eq $null)
@@ -80,6 +63,7 @@ if($children -ne $null)
       $children.children += $new_child
     }
 
+    Write-Host 'update breadcrumb...'
     # powershell read json array(one object array) issue, have to insert array mark manually
     sc $breadcrumb_path ('[' + ($breadcrumb | ConvertTo-Json -Depth 5) + ']') -NoNewline
     Write-Host 'update breadcrumb completed.'
