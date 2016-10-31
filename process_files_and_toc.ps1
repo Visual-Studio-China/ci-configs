@@ -46,6 +46,7 @@ $script_block =
   if($header -match 'Module\s*Name\s*:')
   {
     $topic_type = 'conceptual'
+    $new_header = set_metadata $header $new_header 'uid' ($file_rel_path.split('/',3) | select -Last 1) $true
   }
   
   $new_header = set_metadata $header $new_header 'ms.topic' $topic_type $true
