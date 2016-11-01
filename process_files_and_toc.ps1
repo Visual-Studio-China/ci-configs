@@ -29,7 +29,7 @@ $script_block =
   (gc $file | Out-String) -match $pattern | Out-Null
   $header = $matches[1]
   $new_header = $matches[1]
-  cd $env:APPVEYOR_BUILD_FOLDER
+  cd (Split-Path $file -parent)
 
   $date = (Get-Date (git log --pretty=format:%cd -n 1 --date=iso $file)).ToUniversalTime()
   $new_header = set_metadata $header $new_header 'updated_at' (Get-Date $date -format g) $true
@@ -64,11 +64,15 @@ $script_block =
   {
     $related_links = $matches[0]
     $new_related_links = $matches[0]
-    $related_links | sls "\[\S.*\]\(.*\)" -AllMatches | % matches | ? {$_ -match ".md\s*\)" -and $_ -notmatch "xref:"} | % {
-      $value = "(xref:" + $file_rel_path.Substring(1, $file_rel_path.LastIndexOf('/'))
-      $new_related_links = $new_related_links.replace($_, ($_ -replace "\([^a-z]*", $value -replace "/*$root_name/*",""))
+    $related_links | sls "\[\S.*\]\(.*\)" -AllMatches | % matches | ? {$_ -match "\(.*.md\s*\)" -and $_ -notmatch "xref:"} | % {
+      $rel_path = (rvpa ($matches[0] -replace "\(|\)", "")) -replace ".*$root_name", "" -replace "\\", "/"
+      $value = "(xref:" + $rel_path.Substring(1, $rel_path.LastIndexOf('/'))
+      $new_related_links = $new_related_links.replace($_, ($_ -replace "\(.*/", $value))
     }
-    sc $file (gc $file | Out-String).replace($related_links, $new_related_links) -NoNewline
+    if($related_links -ne $new_related_links)
+    {
+      sc $file (gc $file | Out-String).replace($related_links, $new_related_links) -NoNewline
+    }
   }
 }
 function get_toc
