@@ -67,7 +67,7 @@ $script_block =
     $related_links | sls "\[\S.*\]\(.*\)" -AllMatches | % matches | ? {$_ -match "\(.*.md\s*\)" -and $_ -notmatch "xref:"} | % {
       $rel_path = (rvpa ($matches[0] -replace "\(|\)", "")) -replace ".*$root_name", "" -replace "\\", "/"
       $value = "(xref:" + $rel_path.Substring(1, $rel_path.LastIndexOf('/'))
-      $new_related_links = $new_related_links.replace($_, ($_ -replace "\(.*/", $value))
+      $new_related_links = $new_related_links.replace($_, ($_ -replace "\\", "/" -replace "\(.*/", $value))
     }
     if($related_links -ne $new_related_links)
     {
