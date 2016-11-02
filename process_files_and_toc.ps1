@@ -26,9 +26,18 @@ $script_block =
     return $new_header
   }
 
-  (gc $file | Out-String) -match $pattern | Out-Null
-  $header = $matches[1]
-  $new_header = $matches[1]
+  $platyPS_file = $true
+  if((gc $file | Out-String) -match $pattern)
+  {
+    $header = $matches[1]
+    $new_header = $matches[1]
+  }
+  else
+  {
+    $platyPS_file = $false
+    $header = ""
+    $new_header = ""
+  }
   cd (Split-Path $file -parent)
 
   $date = (Get-Date (git log --pretty=format:%cd -n 1 --date=iso $file)).ToUniversalTime()
@@ -44,7 +53,7 @@ $script_block =
   $new_header = set_metadata $header $new_header 'gitcommit' $git_commit_url  $true
 
   $topic_type = 'reference'
-  if($header -match 'Module\s*Name\s*:')
+  if(!$platyPS_file -or $header -match 'Module\s*Name\s*:')
   {
     $topic_type = 'conceptual'
     $new_header = set_metadata $header $new_header 'uid' ($file_rel_path.split('/',3) | select -Last 1) $true
@@ -58,9 +67,16 @@ $script_block =
   $new_header = set_metadata $header $new_header 'ms.author' ${env:ms.author}
   $new_header = set_metadata $header $new_header 'keywords' $env:keywords
   $new_header = set_metadata $header $new_header 'manager' $env:manager
-  sc $file (gc $file | Out-String).replace($header, ($new_header -replace "{|}", "")) -NoNewline
+  if($platyPS_file)
+  {
+    sc $file (gc $file | Out-String).replace($header, ($new_header -replace "{|}", "")) -NoNewline
+  }
+  else
+  {
+    sc $file ("---" + "`r`n" + $new_header + "---" + "`r`n" + (gc $file | Out-String)) -NoNewline
+  }
 
-  if((gc $file | Out-String) -match "#*\s*RELATED\s*LINKS\s*(.|\n)*")
+  if($platyPS_file -and (gc $file | Out-String) -match "#*\s*RELATED\s*LINKS\s*(.|\n)*")
   {
     $related_links = $matches[0]
     $new_related_links = $matches[0]
@@ -132,7 +148,7 @@ $MaxThreads = 8
 $RunspacePool = [RunspaceFactory ]::CreateRunspacePool(1, $MaxThreads)
 $RunspacePool.Open()
 $Jobs = @()
-$files = ls $global:root_path -r | ? {$_.extension -eq '.md' -and (gc $_.FullName | Out-String) -match $pattern} | % { $_.FullName }
+$files = ls $global:root_path -r | ? {$_.extension -eq '.md'} | % { $_.FullName }
 $files | % {
   $Job = [powershell]::Create().AddScript($script_block).AddArgument($_).AddArgument($global:root_name).AddArgument($pattern)
   $Job.RunspacePool = $RunspacePool
