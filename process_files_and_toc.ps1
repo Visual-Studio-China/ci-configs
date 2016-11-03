@@ -130,7 +130,10 @@ $script_block =
   if(!$platyPS_file -or $header -match $landing_page_pattern)
   {
     $topic_type = 'conceptual'
-    $new_header = SetMetadata $header $new_header 'uid' ($file_rel_path.split('/',3) | select -Last 1) $true
+    if((Split-Path $file -Leaf) -ne "index.md")
+    {
+      $new_header = SetMetadata $header $new_header 'uid' ($file_rel_path.split('/',3) | select -Last 1) $true
+    }
   }
   
   $new_header = SetMetadata $header $new_header 'ms.topic' $topic_type $true
