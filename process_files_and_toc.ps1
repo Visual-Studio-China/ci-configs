@@ -70,7 +70,7 @@ Function global:DoGetToc
     ac $toc_path ($pre + "  items:")
     if(($sub_folders | select -First 1).Name -match 'v\d(.\d)*')
     {
-      $sub_folders = $sub_folders | sort -Property Name -Descending
+      $sub_folders = $sub_folders | sort -Property @{Expression={New-Object System.Version $_.Name.replace('v', '')}; Ascending = $False}
     }
     $sub_folders | % {DoGetToc $_.FullName ($level + 1)}
   }
