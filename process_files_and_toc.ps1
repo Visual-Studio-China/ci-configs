@@ -153,6 +153,7 @@ $script_block =
   $new_header = SetMetadata $header $new_header 'ms.author' ${env:ms.author}
   $new_header = SetMetadata $header $new_header 'keywords' $env:keywords
   $new_header = SetMetadata $header $new_header 'manager' $env:manager
+  $new_header = SetMetadata $header $new_header 'id' (($file_rel_path.split('/',3) | select -Last 1) -replace "[^a-zA-Z0-9]", "_")
 
   if($platyPS_file)
   {
