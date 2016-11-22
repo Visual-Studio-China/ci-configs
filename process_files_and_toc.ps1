@@ -108,6 +108,9 @@ $script_block =
     return $new_header
   }
 
+  # remove empty header first
+  sc $file ((gc $file | Out-String) -replace "-{3}(\r?\n)+-{3}", "") -NoNewline
+
   if((gc $file | Out-String) -match $pattern)
   {
     $header = $matches[1]
