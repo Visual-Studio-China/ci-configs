@@ -156,6 +156,7 @@ $script_block =
   $new_header = SetMetadata $header $new_header 'ms.author' ${env:ms.author}
   $new_header = SetMetadata $header $new_header 'keywords' $env:keywords
   $new_header = SetMetadata $header $new_header 'manager' $env:manager
+  $new_header = SetMetadata $header $new_header 'open_to_public_contributors' ($env:open_to_public_contributors -ne 'false')
 
   if($platyPS_file)
   {
