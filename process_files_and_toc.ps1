@@ -95,7 +95,11 @@ $script_block =
   Function SetMetadata
   {
     param([string]$header, [string]$new_header, [string]$key, [string]$value, [bool]$overwrite)
-
+	
+	if([string]::IsNullOrWhiteSpace($value))
+	{
+	  return $new_header
+	}
     $meta = "(?m)^$key\s*:[\s\S].*"
     if($header -match $meta -and $overwrite)
     {
