@@ -87,10 +87,11 @@ Function global:DoGetToc
 
 $script_block =
 {
-  param([string]$file, [string]$root_name, [string]$pattern, [string]$landing_page_pattern)
+  param([string]$file, [string]$root_path, [string]$pattern, [string]$landing_page_pattern)
 
   $related_link_pattern = "#*\s*RELATED\s*LINKS\s*(.|\n)*"
   $platyPS_file = $true
+  $root_name = Split-Path $root_path -Leaf
 
   Function SetMetadata
   {
@@ -154,13 +155,25 @@ $script_block =
   
   $new_header = SetMetadata $header $new_header 'ms.topic' $topic_type $true
   $new_header = SetMetadata $header $new_header 'ms.prod' $env:prod
-  $new_header = SetMetadata $header $new_header 'ms.service' $env:service
   $new_header = SetMetadata $header $new_header 'ms.technology' $env:technology
   $new_header = SetMetadata $header $new_header 'author' $env:author
   $new_header = SetMetadata $header $new_header 'ms.author' ${env:ms.author}
   $new_header = SetMetadata $header $new_header 'keywords' $env:keywords
   $new_header = SetMetadata $header $new_header 'manager' $env:manager
   $new_header = SetMetadata $header $new_header 'open_to_public_contributors' ($env:open_to_public_contributors -ne 'false')
+
+  $ms_service_file = Join-Path $root_path "ms.service.json"
+  $service = ""
+  if(Test-Path $ms_service_file)
+  {
+	$ms_service = (gc $ms_service_file -raw) | ConvertFrom-Json
+    $service = $ms_service.($file_rel_path.split('/')[2]).($file_rel_path.split('/')[3])
+  }
+  if([string]::IsNullOrWhiteSpace($service))
+  {
+    $service = $env:service
+  }
+  $new_header = SetMetadata $header $new_header 'ms.service' $service
 
   if($platyPS_file)
   {
@@ -197,8 +210,8 @@ Function ProcessFiles
   $RunspacePool = [RunspaceFactory ]::CreateRunspacePool(1, $max_threads)
   $RunspacePool.Open()
   $Jobs = @()
-  ls $root_path -r | ? {$_.extension -eq '.md'} | % {
-    $Job = [powershell]::Create().AddScript($script_block).AddArgument($_.FullName).AddArgument($root_name).AddArgument($header_pattern).AddArgument($landing_page_pattern)
+  ls $root_path -r "*.md" | % {
+    $Job = [powershell]::Create().AddScript($script_block).AddArgument($_.FullName).AddArgument($root_path).AddArgument($header_pattern).AddArgument($landing_page_pattern)
     $Job.RunspacePool = $RunspacePool
     $Jobs += New-Object PSObject -Property @{
       RunNum = $_.FullName
