@@ -2,7 +2,7 @@
 .SYNOPSIS
     This is a Powershell script to process files and generate a toc file.
 .DESCRIPTION
-    This script is used in specific ci projects(appveyor.yml) and depending on both
+    This script is used in specific ci projects(appveyor.yml) and depends on both
     APPVEYOR built-in environment variables and the ones defined in those projects.
     We didn't decouple it cause we want to keep the update as more as possible in this
     script instead of in the appveyor.yml.
@@ -100,6 +100,10 @@ $script_block =
 	if([string]::IsNullOrWhiteSpace($value))
 	{
 	  return $new_header
+	}
+	if($value -match "true|false")
+	{
+	  $value = $value.ToLower()
 	}
     $meta = "(?m)^$key\s*:[\s\S].*"
     if($header -match $meta -and $overwrite)
