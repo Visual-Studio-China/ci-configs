@@ -52,7 +52,7 @@ Function global:DoGetToc
   $sub_folders = ls $folder_path -dir
   if($sub_folders -eq $null)
   {
-    $files = (ls $folder_path) | ? { $_.Extension -eq '.md' } | select -ExpandProperty FullName
+    $files = ls $folder_path *.md | select -ExpandProperty FullName
     $landing_page = ""
     $files | ? {(gc $_ | Out-String) -match $header_pattern -and $matches[1] -match $landing_page_pattern} | select -First 1 | % {
       ac $toc_path ($pre + "  href: " + ($_ -replace ".*$root_name", ".."))
@@ -68,6 +68,8 @@ Function global:DoGetToc
   else
   {
     ac $toc_path ($pre + "  items:")
+	ls $folder_path *.md | ? {$_.Name -ne "index.md"} | select -ExpandProperty FullName | % {ac $toc_path ($pre + "    - name: " + (gi $_).BaseName + "`r`n" + $pre + "      href: " + ($_ -replace ".*$root_name", ".."))}
+
     if(($sub_folders | select -First 1).Name -match 'v\d(.\d)*')
     {
       $sub_folders = $sub_folders | sort -Property @{
