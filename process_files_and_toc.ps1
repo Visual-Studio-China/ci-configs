@@ -145,6 +145,7 @@ $script_block =
   $git_prefix = 'https://github.com/' + $env:APPVEYOR_REPO_NAME + '/blob/'
   $content_git_url = (New-Object System.Uri ($git_prefix + $env:APPVEYOR_REPO_BRANCH + $file_rel_path)).AbsoluteUri
   $new_header = SetMetadata $header $new_header 'content_git_url' $content_git_url  $true
+  $new_header = SetMetadata $header $new_header 'original_content_git_url' $content_git_url  $true
 
   $git_commit_url = (New-Object System.Uri ($git_prefix + (git rev-list -1 HEAD $file) + $file_rel_path)).AbsoluteUri
   $new_header = SetMetadata $header $new_header 'gitcommit' $git_commit_url  $true
