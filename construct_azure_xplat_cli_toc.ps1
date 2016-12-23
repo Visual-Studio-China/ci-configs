@@ -73,7 +73,7 @@ Function global:DoGetReferenceToc
   }
   
   ac $toc_path ($pre + "- name: " + (Split-Path $folder_path -Leaf))
-  ac $toc_path ($pre + "  href: " + (Resolve-Path (ls $folder_path *.xyml | select -First 1).FullName -Relative))
+  ac $toc_path ($pre + "  href: " + (Resolve-Path (ls $folder_path *.yml | select -First 1).FullName -Relative))
   
   $sub_folders = ls $folder_path -dir
   if($sub_folders -ne $null)
