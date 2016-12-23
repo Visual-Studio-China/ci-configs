@@ -57,7 +57,7 @@ Function global:DoGetConceptualToc
   if($sub_folders -ne $null)
   {
     ac $toc_path ($pre + "  items:")
-	$sub_folders | % {DoGetConceptualToc $_.FullName ($level + 1)}
+    $sub_folders | % {DoGetConceptualToc $_.FullName ($level + 1)}
   }
 }
 
@@ -79,11 +79,13 @@ Function global:DoGetReferenceToc
   if($sub_folders -ne $null)
   {
     ac $toc_path ($pre + "  items:")
-	$sub_folders | % {DoGetReferenceToc $_.FullName ($level + 1)}
+    $sub_folders | % {DoGetReferenceToc $_.FullName ($level + 1)}
   }
 }
 
+
 echo "generate toc..."
+cd $root_path
 if(Test-Path $toc_path)
 {
   rm $toc_path
