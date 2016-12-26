@@ -93,7 +93,6 @@ Function ProcessReferenceFiles
   $metadata = "Metadata:"
   $file_rel_path = $path -replace ".*$root_name", "/$root_name" -replace "\\", "/"
   $git_url = (New-Object System.Uri ($git_prefix + $env:APPVEYOR_REPO_BRANCH + $file_rel_path)).AbsoluteUri
-  $metadata = $metadata + "`r`n" + $pre + "original_content_git_url: " + $git_url
   $metadata = $metadata + "`r`n" + $pre + "content_git_url: " + $git_url
   $date = (Get-Date (git log --pretty=format:%cd -n 1 --date=iso $path)).ToUniversalTime()
   $metadata = $metadata + "`r`n" + $pre + "update_at: " + (Get-Date $date -format g)
@@ -101,13 +100,30 @@ Function ProcessReferenceFiles
   $git_commit = (New-Object System.Uri ($git_prefix + (git rev-list -1 HEAD $path) + $file_rel_path)).AbsoluteUri
   $metadata = $metadata + "`r`n" + $pre + "gitcommit: " + $git_commit
   $metadata = $metadata + "`r`n" + $pre + 'ms.topic: reference'
-  $metadata = $metadata + "`r`n" + $pre + 'ms.prod: ' + ${env:prod}
-  $metadata = $metadata + "`r`n" + $pre + 'ms.technology: ' + ${env:technology}
-  $metadata = $metadata + "`r`n" + $pre + 'author' + ${env:author}
-  $metadata = $metadata + "`r`n" + $pre + 'ms.author' + ${env:ms.author}
-  $metadata = $metadata + "`r`n" + $pre + 'keywords' + ${env:keywords}
-  $metadata = $metadata + "`r`n" + $pre + 'manager' + ${env:manager}
-  
+  if(![string]::IsNullOrWhiteSpace(${env:prod}))
+  {
+    $metadata = $metadata + "`r`n" + $pre + 'ms.prod: ' + ${env:prod}
+  }
+  if(![string]::IsNullOrWhiteSpace(${env:technology}))
+  {
+    $metadata = $metadata + "`r`n" + $pre + 'ms.technology: ' + ${env:technology}
+  }
+  if(![string]::IsNullOrWhiteSpace(${env:author}))
+  {
+    $metadata = $metadata + "`r`n" + $pre + 'author' + ${env:author}
+  }
+  if(![string]::IsNullOrWhiteSpace(${env:ms.author}))
+  {
+    $metadata = $metadata + "`r`n" + $pre + 'ms.author' + ${env:ms.author}
+  }
+  if(![string]::IsNullOrWhiteSpace(${env:keywords}))
+  {
+    $metadata = $metadata + "`r`n" + $pre + 'keywords' + ${env:keywords}
+  }
+  if(![string]::IsNullOrWhiteSpace(${env:manager}))
+  {
+    $metadata = $metadata + "`r`n" + $pre + 'manager' + ${env:manager}
+  }
   ac $path $metadata
 }
 
@@ -118,10 +134,6 @@ Function SetMetadata
   if([string]::IsNullOrWhiteSpace($value))
   {
     return $new_header
-  }
-  if($value -match "true|false")
-  {
-    $value = $value.ToLower()
   }
   $meta = "(?m)^$key\s*:[\s\S].*"
   if($header -match $meta -and $overwrite)

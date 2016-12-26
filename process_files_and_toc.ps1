@@ -98,15 +98,11 @@ $script_block =
   Function SetMetadata
   {
     param([string]$header, [string]$new_header, [string]$key, [string]$value, [bool]$overwrite)
-	
-	if([string]::IsNullOrWhiteSpace($value))
-	{
-	  return $new_header
-	}
-	if($value -match "true|false")
-	{
-	  $value = $value.ToLower()
-	}
+
+    if([string]::IsNullOrWhiteSpace($value))
+    {
+      return $new_header
+    }
     $meta = "(?m)^$key\s*:[\s\S].*"
     if($header -match $meta -and $overwrite)
     {
@@ -173,7 +169,7 @@ $script_block =
   $service = ""
   if(Test-Path $ms_service_file)
   {
-	$ms_service = (gc $ms_service_file -raw) | ConvertFrom-Json
+    $ms_service = (gc $ms_service_file -raw) | ConvertFrom-Json
     $service = $ms_service.($file_rel_path.split('/')[2]).($file_rel_path.split('/')[3])
   }
   if([string]::IsNullOrWhiteSpace($service))
