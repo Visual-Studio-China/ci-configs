@@ -25,7 +25,7 @@ $git_prefix = 'https://github.com/' + $env:APPVEYOR_REPO_NAME + '/blob/'
 
 Function GetReferenceToc
 {
-  ls $root_path -dir | ?{$_.Name -ne "Conceptual"} | % {DoGetReferenceToc $_.FullName 0} 
+  ls $root_path -dir | ?{$_.Name -ne "Conceptual" -and $_.Name -ne "specs"} | % {DoGetReferenceToc $_.FullName 0} 
   sc $toc_path (gc $toc_path | Out-String).replace("\", "/") -NoNewline
 }
 
