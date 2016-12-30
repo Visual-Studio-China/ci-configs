@@ -25,7 +25,7 @@ $git_prefix = 'https://github.com/' + $env:APPVEYOR_REPO_NAME + '/blob/'
 
 Function GetReferenceToc
 {
-  ls $root_path -dir | ?{$_.Name -ne "Conceptual" -and $_.Name -ne "specs"} | % {DoGetReferenceToc $_.FullName 0} 
+  DoGetReferenceToc $root_path 0
   sc $toc_path (gc $toc_path | Out-String).replace("\", "/") -NoNewline
 }
 
@@ -73,15 +73,15 @@ Function global:DoGetReferenceToc
   {
     $pre = $pre + "    "
   }
-  
-  ac $toc_path ($pre + "- name: " + (Split-Path $folder_path -Leaf))
-  ac $toc_path ($pre + "  href: " + (Resolve-Path (ls $folder_path *.yml | select -First 1).FullName -Relative))
-  
-  $sub_folders = ls $folder_path -dir
-  if($sub_folders -ne $null)
-  {
-    ac $toc_path ($pre + "  items:")
-    $sub_folders | % {DoGetReferenceToc $_.FullName ($level + 1)}
+  ls $folder_path *.yml | ? {$_.BaseName -ne "toc"} | % {
+    ac $toc_path ($pre + "- name: " + ($_.BaseName))
+    ac $toc_path ($pre + "  href: " + (Resolve-Path $_.FullName -Relative))
+    $sub_path = Join-Path $folder_path $_.BaseName
+    if(Test-Path $sub_path)
+    {
+      ac $toc_path ($pre+ "  items:")
+      DoGetReferenceToc $sub_path ($level + 1)
+    }
   }
 }
 
