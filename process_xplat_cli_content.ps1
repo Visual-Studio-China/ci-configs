@@ -189,20 +189,19 @@ Function ProcessConceptualFiles
     $header = ""
     $new_header = ""
   }
-  cd (Split-Path $path -parent)
-  $date = (Get-Date (git log --pretty=format:%cd -n 1 --date=iso $path)).ToUniversalTime()
+  $file_rel_path = $path -replace ".*$root_name", "/$root_name" -replace "\\", "/" -replace ".*Conceptual","/Documentation"
+  $file_full_path = Join-Path $env:APPVEYOR_BUILD_FOLDER $file_rel_path
+  cd (Split-Path $file_full_path -parent)
+  $date = (Get-Date (git log --pretty=format:%cd -n 1 --date=iso $file_full_path)).ToUniversalTime()
   $new_header = SetMetadata $header $new_header 'updated_at' (Get-Date $date -format g) $true
   $new_header = SetMetadata $header $new_header 'ms.date' (Get-Date $date -format d) $true
-
-  $file_rel_path = $path -replace ".*$root_name", "/$root_name" -replace "\\", "/"
   $content_git_url = (New-Object System.Uri ($git_prefix + $env:APPVEYOR_REPO_BRANCH + $file_rel_path)).AbsoluteUri
   $new_header = SetMetadata $header $new_header 'content_git_url' $content_git_url  $true
   $new_header = SetMetadata $header $new_header 'original_content_git_url' $content_git_url  $true
 
-  $git_commit_url = (New-Object System.Uri ($git_prefix + (git rev-list -1 HEAD $path) + $file_rel_path)).AbsoluteUri
+  $git_commit_url = (New-Object System.Uri ($git_prefix + (git rev-list -1 HEAD $file_full_path) + $file_rel_path)).AbsoluteUri
   $new_header = SetMetadata $header $new_header 'gitcommit' $git_commit_url  $true
 
-  $topic_type = 'reference'
   $new_header = SetMetadata $header $new_header 'ms.topic: conceptual'
   $new_header = SetMetadata $header $new_header 'ms.prod' ${env:prod}
   $new_header = SetMetadata $header $new_header 'ms.technology' ${env:technology}
@@ -211,6 +210,7 @@ Function ProcessConceptualFiles
   $new_header = SetMetadata $header $new_header 'keywords' ${env:keywords}
   $new_header = SetMetadata $header $new_header 'manager' ${env:manager}
   $new_header = SetMetadata $header $new_header 'ms.service' ${env:manager}
+  $new_header = SetMetadata $header $new_header 'open_to_public_contributors' 'true'
 
   if($header -ne $new_header)
   {
