@@ -85,45 +85,70 @@ Function global:DoGetReferenceToc
   }
 }
 
+Function GetJsFilePath
+{
+  param([string]$file_path)
+  
+  $all = gc $file_path | Out-String | sls "filePath:.*js" -AllMatches | % matches | % {$_ -replace "filePath:\s*", ""}
+  if($all -eq $null -or $all.count -eq 0)
+  {
+    return $null
+  }
+  $js_path = $all[0]
+  foreach($t in $all)
+  {
+    if($t -ne $js_path)
+    {
+      return $null
+    }
+  }
+  return $js_path
+}
+
+Function AssembleMetadata
+{
+  param([string]$metadata, [string]$key, [string]$value)
+  
+  if([string]::IsNullOrWhiteSpace($key) -or [string]::IsNullOrWhiteSpace($value))
+  {
+    return $metadata
+  }
+  return $metadata = $metadata + "  " + $key + ": " + $value + "`r`n"
+}
+
 Function ProcessReferenceFiles
 {
   param([string]$path)
-  $pre = "  "
-  cd (Split-Path $path -parent)
-  $metadata = "Metadata:"
-  $file_rel_path = $path -replace ".*$root_name", "/$root_name" -replace "\\", "/"
-  $git_url = (New-Object System.Uri ($git_prefix + $env:APPVEYOR_REPO_BRANCH + $file_rel_path)).AbsoluteUri
-  $metadata = $metadata + "`r`n" + $pre + "content_git_url: " + $git_url
-  $date = (Get-Date (git log --pretty=format:%cd -n 1 --date=iso $path)).ToUniversalTime()
-  $metadata = $metadata + "`r`n" + $pre + "update_at: " + (Get-Date $date -format g)
-  $metadata = $metadata + "`r`n" + $pre + "ms.date: " + (Get-Date $date -format d)
-  $git_commit = (New-Object System.Uri ($git_prefix + (git rev-list -1 HEAD $path) + $file_rel_path)).AbsoluteUri
-  $metadata = $metadata + "`r`n" + $pre + "gitcommit: " + $git_commit
-  $metadata = $metadata + "`r`n" + $pre + 'ms.topic: reference'
-  if(![string]::IsNullOrWhiteSpace(${env:prod}))
+  
+  $metadata = "Metadata:" + "`r`n"
+  $metadata = AssembleMetadata $metadata "ms.topic" "reference"
+  $js_path = GetJsFilePath $path
+  if($js_path -eq $null)
   {
-    $metadata = $metadata + "`r`n" + $pre + 'ms.prod: ' + ${env:prod}
+    $metadata = AssembleMetadata $metadata "open_to_public_contributors" "false"
   }
-  if(![string]::IsNullOrWhiteSpace(${env:technology}))
+  else
   {
-    $metadata = $metadata + "`r`n" + $pre + 'ms.technology: ' + ${env:technology}
+    $metadata = AssembleMetadata $metadata "open_to_public_contributors" "true"
+    $git_url = (New-Object System.Uri ($git_prefix + $env:APPVEYOR_REPO_BRANCH + '/lib/' + $js_path)).AbsoluteUri
+    $metadata = AssembleMetadata $metadata "content_git_url" $git_url
+    $metadata = AssembleMetadata $metadata "original_content_git_url" $git_url    
+    $js_full_path = Join-Path $env:APPVEYOR_BUILD_FOLDER "lib\$js_path"
+    cd (split-path $js_full_path -parent)
+    $date = (Get-Date (git log --pretty=format:%cd -n 1 --date=iso $js_full_path)).ToUniversalTime()
+    $metadata = AssembleMetadata $metadata "update_at" (Get-Date $date -format g)
+    $metadata = AssembleMetadata $metadata "ms.date" (Get-Date $date -format d)
+    $git_commit = (New-Object System.Uri ($git_prefix + (git rev-list -1 HEAD $js_full_path) + '/lib/' + $js_path)).AbsoluteUri
+    $metadata = AssembleMetadata $metadata "gitcommit" $git_commit
   }
-  if(![string]::IsNullOrWhiteSpace(${env:author}))
-  {
-    $metadata = $metadata + "`r`n" + $pre + 'author' + ${env:author}
-  }
-  if(![string]::IsNullOrWhiteSpace(${env:ms.author}))
-  {
-    $metadata = $metadata + "`r`n" + $pre + 'ms.author' + ${env:ms.author}
-  }
-  if(![string]::IsNullOrWhiteSpace(${env:keywords}))
-  {
-    $metadata = $metadata + "`r`n" + $pre + 'keywords' + ${env:keywords}
-  }
-  if(![string]::IsNullOrWhiteSpace(${env:manager}))
-  {
-    $metadata = $metadata + "`r`n" + $pre + 'manager' + ${env:manager}
-  }
+  
+  $metadata = AssembleMetadata $metadata 'ms.prod' ${env:prod}
+  $metadata = AssembleMetadata $metadata 'ms.technology' ${env:technology}
+  $metadata = AssembleMetadata $metadata 'author' ${env:author}
+  $metadata = AssembleMetadata $metadata 'ms.author' ${env:ms.author}
+  $metadata = AssembleMetadata $metadata 'keywords' ${env:keywords}
+  $metadata = AssembleMetadata $metadata 'manager' ${env:manager}
+
   ac $path $metadata
 }
 
