@@ -54,7 +54,6 @@ Function global:DoGetConceptualToc
     ac $toc_path ($pre + "- name: " + $_.BaseName)
     ac $toc_path ($pre + "  href: " + (Resolve-Path $_.FullName -Relative))
     }
-  
   $sub_folders = ls $folder_path -dir
   if($sub_folders -ne $null)
   {
@@ -113,7 +112,7 @@ Function AssembleMetadata
   {
     return $metadata
   }
-  return $metadata = $metadata + "  " + $key + ": " + $value + "`r`n"
+  return ($metadata + "  " + $key + ": " + $value + "`r`n")
 }
 
 Function ProcessReferenceFiles
@@ -226,7 +225,7 @@ Function ProcessConceptualFiles
 }
 Function ProcessFiles
 {
-  ls $root_path -dir | ? {$_.BaseName -ne "Conceptual"} | % {ls $_.FullName *.yml -r} | % {ProcessReferenceFiles $_.FullName}
+  ls $root_path *.yml -r | ? {$_.BaseName -ne 'toc'} | % {ProcessReferenceFiles $_.FullName}
   ls $root_path -dir | ? {$_.BaseName -eq "Conceptual"} | % {ls $_.FullName *.md -r} | % {ProcessConceptualFiles $_.FullName}
 }
 
