@@ -93,6 +93,10 @@ Function GetJsFilePath
   {
     return $null
   }
+  if($all.count -eq 1)
+  {
+    return $all
+  }
   $js_path = $all[0]
   foreach($t in $all)
   {
