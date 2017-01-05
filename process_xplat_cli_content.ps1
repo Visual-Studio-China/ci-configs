@@ -11,7 +11,6 @@ param(
     [string]$root_path
 )
 
-
 if($root_path -eq $null -or !(Test-Path $root_path))
 {
   Write-Error "Please enter the root path to construct toc!"
@@ -22,38 +21,43 @@ $root_name = Split-Path $root_path -Leaf
 $toc_path = Join-Path $root_path "toc.yml"
 $git_prefix = 'https://github.com/' + $env:APPVEYOR_REPO_NAME + '/blob/'
 
-
-Function GetReferenceToc
+Function GetToc
 {
-  DoGetReferenceToc $root_path 0
-  sc $toc_path (gc $toc_path | Out-String).replace("\", "/") -NoNewline
-}
-
-Function GetConceptualToc
-{
+  cd $root_path
+  if(Test-Path $toc_path)
+  {
+    rm $toc_path
+  }
+  ni $toc_path
   $conceptual = Join-Path $root_path "Conceptual"
-  if(Test-Path $conceptual)
+  if(Test-Path $conceptual -and (ls $conceptual).count -ne 0)
   {
     ac $toc_path "- name: Conceptual"
     ac $toc_path "  items:"
     DoGetConceptualToc $conceptual 1
   }
+  DoGetReferenceToc $root_path 0
+  sc $toc_path (gc $toc_path | Out-String).replace("\", "/") -NoNewline
+}
+
+Function PreparePre
+{
+  param([int]$level)
+  
+  $pre = ""
+  for($i=0;$i -lt $level;$i++)
+  {
+    $pre = $pre + "    "
+  }
+  return $pre
 }
 
 Function global:DoGetConceptualToc
 {
   param([string]$folder_path, [int]$level)
 
-  $pre = ""
-
-  for($i=0;$i -lt $level;$i++)
-  {
-    $pre = $pre + "    "
-  }
-  ls $folder_path *.md | % {
-    ac $toc_path ($pre + "- name: " + $_.BaseName)
-    ac $toc_path ($pre + "  href: " + (Resolve-Path $_.FullName -Relative))
-    }
+  $pre = PreparePre $level
+  ls $folder_path *.md | % {ac $toc_path (($pre + "- name: " + $_.BaseName) + "`r`n" + $pre + "  href: " + (Resolve-Path $_.FullName -Relative))}
   $sub_folders = ls $folder_path -dir
   if($sub_folders -ne $null)
   {
@@ -66,15 +70,9 @@ Function global:DoGetReferenceToc
 {
   param([string]$folder_path, [int]$level)
 
-  $pre = ""
-
-  for($i=0;$i -lt $level;$i++)
-  {
-    $pre = $pre + "    "
-  }
+  $pre = PreparePre $level
   ls $folder_path *.yml | ? {$_.BaseName -ne "toc"} | % {
-    ac $toc_path ($pre + "- name: " + ($_.BaseName))
-    ac $toc_path ($pre + "  href: " + (Resolve-Path $_.FullName -Relative))
+    ac $toc_path ($pre + "- name: " + ($_.BaseName) + "`r`n" + $pre + "  href: " + (Resolve-Path $_.FullName -Relative))
     $sub_path = Join-Path $folder_path $_.BaseName
     if(Test-Path $sub_path)
     {
@@ -144,7 +142,7 @@ Function ProcessReferenceFiles
     $git_commit = (New-Object System.Uri ($git_prefix + (git rev-list -1 HEAD $js_full_path) + '/lib/' + $js_path)).AbsoluteUri
     $metadata = AssembleMetadata $metadata "gitcommit" $git_commit
   }
-  
+
   $metadata = AssembleMetadata $metadata 'ms.prod' ${env:prod}
   $metadata = AssembleMetadata $metadata 'ms.technology' ${env:technology}
   $metadata = AssembleMetadata $metadata 'author' ${env:author}
@@ -234,15 +232,7 @@ Function ProcessFiles
 }
 
 echo "generate toc..."
-cd $root_path
-if(Test-Path $toc_path)
-{
-  rm $toc_path
-}
-ni $toc_path
-GetConceptualToc
-GetReferenceToc
-
+GetToc
 echo "completed successfully"
 
 echo "process files..."
