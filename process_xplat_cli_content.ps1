@@ -30,7 +30,7 @@ Function GetToc
   }
   ni $toc_path
   $conceptual = Join-Path $root_path "Conceptual"
-  if(Test-Path $conceptual -and (ls $conceptual).count -ne 0)
+  if((Test-Path $conceptual) -and (ls $conceptual).count -ne 0)
   {
     ac $toc_path "- name: Conceptual"
     ac $toc_path "  items:"
