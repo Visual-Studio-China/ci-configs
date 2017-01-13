@@ -9,27 +9,17 @@
 #>
 
 # Validate that the repo has only one root folder
-if((ls $env:APPVEYOR_BUILD_FOLDER -dir).count -ne 1)
+if((Get-ChildItem $env:APPVEYOR_BUILD_FOLDER -dir).count -ne 1)
 {
   $host.SetShouldExit(-1)
 }
 
 $header_pattern = "^(?s)\s*[-]{3}(.*?)[-]{3}\r?\n"
 $landing_page_pattern = "Module\s*Name\s*:"
-$root_path = (ls $env:APPVEYOR_BUILD_FOLDER -dir | select -First 1).FullName
+$root_path = (Get-ChildItem $env:APPVEYOR_BUILD_FOLDER -dir | Select-Object -First 1).FullName
 $root_name = Split-Path $root_path -Leaf
 $toc_path = Join-Path $root_path "toc.yml"
 
-Function GetToc
-{
-  if(Test-Path $toc_path)
-  {
-    rm $toc_path
-  }
-  ni $toc_path
-  ls $root_path -dir | % {DoGetToc $_.FullName 0} 
-  sc $toc_path (gc $toc_path | Out-String).replace("\", "/") -NoNewline
-}
 
 Function global:DoGetToc
 {
@@ -42,37 +32,39 @@ Function global:DoGetToc
     $pre = $pre + "    "
   }
   
-  ac $toc_path ($pre + "- name: " + (Split-Path $folder_path -Leaf))
-  $index = ls $folder_path | ? {$_.Name -eq 'index.md'} | select -ExpandProperty FullName
+  Add-Content $toc_path ($pre + "- name: " + (Split-Path $folder_path -Leaf))
+  $index = Get-ChildItem $folder_path | ? {$_.Name -eq 'index.md'} | Select-Object -ExpandProperty FullName
   if($index -ne $null)
   {
-    ac $toc_path ($pre + "  href: " + ($index -replace ".*$root_name", ".."))
+    Add-Content $toc_path ($pre + "  href: " + ($index -replace ".*$root_name", ".."))
   }
   
-  $sub_folders = ls $folder_path -dir
+  $sub_folders = Get-ChildItem $folder_path -dir
   if($sub_folders -eq $null)
   {
-    $files = ls $folder_path *.md | select -ExpandProperty FullName
+    $files = Get-ChildItem $folder_path *.md | Select-Object -ExpandProperty FullName
     $landing_page = ""
-    $files | ? {(gc $_ | Out-String) -match $header_pattern -and $matches[1] -match $landing_page_pattern} | select -First 1 | % {
-      ac $toc_path ($pre + "  href: " + ($_ -replace ".*$root_name", ".."))
+    $files | ? {(Get-Content $_ | Out-String) -match $header_pattern -and $matches[1] -match $landing_page_pattern} | Select-Object -First 1 | % {
+      Add-Content $toc_path ($pre + "  href: " + ($_ -replace ".*$root_name", ".."))
       $landing_page = $_
     }
 
-    ac $toc_path ($pre + "  items:")
+    Add-Content $toc_path ($pre + "  items:")
     $pre = $pre + "    "
     $files | ? {$_ -ne $landing_page} | % {
-      ac $toc_path ($pre + "- name: " + (gi $_).BaseName + "`r`n" + $pre + "  href: " + ($_ -replace ".*$root_name", ".."))
+      Add-Content $toc_path ($pre + "- name: " + (Get-Item $_).BaseName + "`r`n" + $pre + "  href: " + ($_ -replace ".*$root_name", ".."))
     }
   }
   else
   {
-    ac $toc_path ($pre + "  items:")
-	ls $folder_path *.md | ? {$_.Name -ne "index.md"} | select -ExpandProperty FullName | % {ac $toc_path ($pre + "    - name: " + (gi $_).BaseName + "`r`n" + $pre + "      href: " + ($_ -replace ".*$root_name", ".."))}
+    Add-Content $toc_path ($pre + "  items:")
+    Get-ChildItem $folder_path *.md | ? {$_.Name -ne "index.md"} | Select-Object -ExpandProperty FullName | % {
+      Add-Content $toc_path ($pre + "    - name: " + (Get-Item $_).BaseName + "`r`n" + $pre + "      href: " + ($_ -replace ".*$root_name", ".."))
+    }
 
-    if(($sub_folders | select -First 1).Name -match 'v\d(.\d)*')
+    if(($sub_folders | Select-Object -First 1).Name -match 'v\d(.\d)*')
     {
-      $sub_folders = $sub_folders | sort -Property @{
+      $sub_folders = $sub_folders | Sort-Object -Property @{
         Expression = {
           $version = $_.Name.replace('v', '')
           if($version  -match '^\d$')
@@ -116,9 +108,9 @@ $script_block =
   }
 
   # remove empty header first
-  sc $file ((gc $file | Out-String) -replace "-{3}(\r?\n)+-{3}", "") -NoNewline
+  sc $file ((Get-Content $file | Out-String) -replace "-{3}(\r?\n)+-{3}", "") -NoNewline
 
-  if((gc $file | Out-String) -match $pattern)
+  if((Get-Content $file | Out-String) -match $pattern)
   {
     $header = $matches[1]
     $new_header = $matches[1]
@@ -130,7 +122,7 @@ $script_block =
     $new_header = ""
   }
   # need to get git log info and resolve relative path
-  cd (Split-Path $file -parent)
+  Set-Location (Split-Path $file -parent)
 
   # set or update metadata in the header of .md files
   $date = (Get-Date (git log --pretty=format:%cd -n 1 --date=iso $file)).ToUniversalTime()
@@ -152,7 +144,7 @@ $script_block =
     $topic_type = 'conceptual'
     if((Split-Path $file -Leaf) -ne "index.md")
     {
-      $new_header = SetMetadata $header $new_header 'uid' ($file_rel_path.split('/',3) | select -Last 1) $true
+      $new_header = SetMetadata $header $new_header 'uid' ($file_rel_path.split('/',3) | Select-Object -Last 1) $true
     }
   }
   
@@ -169,7 +161,7 @@ $script_block =
   $service = ""
   if(Test-Path $ms_service_file)
   {
-    $ms_service = (gc $ms_service_file -raw) | ConvertFrom-Json
+    $ms_service = (Get-Content $ms_service_file -raw) | ConvertFrom-Json
     $service = $ms_service.($file_rel_path.split('/')[2]).($file_rel_path.split('/')[3])
   }
   if([string]::IsNullOrWhiteSpace($service))
@@ -183,37 +175,37 @@ $script_block =
     # reduce unnecessary file write
     if($header -ne $new_header)
     {
-      sc $file (gc $file | Out-String).replace($header, ($new_header -replace "{|}", "")) -NoNewline
+      Set-Content $file (Get-Content $file | Out-String).replace($header, ($new_header -replace "{|}", "")) -NoNewline
     }
 
     # resolve related links to the format that docfx supports [link name](xref:uid)
-    if((gc $file | Out-String) -match $related_link_pattern)
+    if((Get-Content $file | Out-String) -match $related_link_pattern)
     {
       $related_links = $matches[0]
       $new_related_links = $matches[0]
-      $related_links | sls "\[\S.*\]\(.*\)" -AllMatches | % matches | ? {$_ -match "\(.*.md\s*\)" -and $_ -notmatch "xref:"} | % {
-        $rel_path = (rvpa ($matches[0] -replace "\(|\)", "")) -replace ".*$root_name", "" -replace "\\", "/"
+      $related_links | Select-String "\[\S.*\]\(.*\)" -AllMatches | % matches | ? {$_ -match "\(.*.md\s*\)" -and $_ -notmatch "xref:"} | % {
+        $rel_path = (Resolve-Path ($matches[0] -replace "\(|\)", "")) -replace ".*$root_name", "" -replace "\\", "/"
         $value = "(xref:" + $rel_path.Substring(1, $rel_path.LastIndexOf('/'))
         $new_related_links = $new_related_links.replace($_, ($_ -replace "\\", "/" -replace "\(.*/", $value))
       }
     }
     if($related_links -ne $new_related_links)
     {
-      sc $file (gc $file | Out-String).replace($related_links, $new_related_links) -NoNewline
+      Set-Content $file (Get-Content $file | Out-String).replace($related_links, $new_related_links) -NoNewline
     }
   }
   else
   {
-    sc $file ("---" + "`r`n" + $new_header + "---" + "`r`n" + (gc $file | Out-String)) -NoNewline
+    Set-Content $file ("---" + "`r`n" + $new_header + "---" + "`r`n" + (Get-Content $file | Out-String)) -NoNewline
   }
 }
 Function ProcessFiles
 {
-  param([int]$max_threads)
-  $RunspacePool = [RunspaceFactory ]::CreateRunspacePool(1, $max_threads)
+  $max_threads = 8
+  $RunspacePool = [RunspaceFactory]::CreateRunspacePool(1, $max_threads)
   $RunspacePool.Open()
   $Jobs = @()
-  ls $root_path -r "*.md" | % {
+  Get-ChildItem $root_path -r "*.md" | % {
     $Job = [powershell]::Create().AddScript($script_block).AddArgument($_.FullName).AddArgument($root_path).AddArgument($header_pattern).AddArgument($landing_page_pattern)
     $Job.RunspacePool = $RunspacePool
     $Jobs += New-Object PSObject -Property @{
@@ -224,16 +216,22 @@ Function ProcessFiles
   }
   Do
   {
-    sleep -Seconds 1
+    Start-Sleep -Seconds 5
   } While ($Jobs.Result.IsCompleted -contains $false)
 }
 
 # Step 1: process .md files
 echo "Process files ..."
-ProcessFiles 8
+ProcessFiles
 
 # Step 2: generate toc.yml
 echo "generate toc..."
-GetToc
+if(Test-Path $toc_path)
+{
+  Remove-Item $toc_path
+}
+New-Item $toc_path
+Get-ChildItem $root_path -dir | % {DoGetToc $_.FullName 0}
+Set-Content $toc_path (Get-Content $toc_path | Out-String).replace("\", "/") -NoNewline
 
 echo "completed successfully."

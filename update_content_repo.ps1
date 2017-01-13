@@ -8,40 +8,39 @@
     script instead of in the appveyor.yml.
 #>
 
-# Validate that the repo has only one root folder
-if((ls $env:APPVEYOR_BUILD_FOLDER -dir).count -ne 1)
+if((Get-ChildItem $env:APPVEYOR_BUILD_FOLDER -dir).count -ne 1)
 {
   $host.SetShouldExit(-1)
 }
 
 $ErrorActionPreference = 'Stop'
 
-$root_path = (ls $env:APPVEYOR_BUILD_FOLDER -dir | select -First 1).FullName
+$root_path = (Get-ChildItem $env:APPVEYOR_BUILD_FOLDER -dir | Select-Object -First 1).FullName
 $root_name = Split-Path $root_path -Leaf
 $target_path = Join-Path $env:TEMP\Azure $env:target_folder
 
 Function CopyFiles
 {
-  ls $root_path -dir | % {
+  Get-ChildItem $root_path -dir | % {
     $target = Join-Path $target_path (Split-Path $_.FullName -Leaf)
     if(Test-Path $target)
     {
-      rm $target -Recurse -Force
+      Remove-Item $target -Recurse -Force
     }
-    copy $_.FullName $target -Recurse -Force
+    Copy-Item $_.FullName $target -Recurse -Force
   }
 
   $toc_folder = Join-Path $target_path $root_name
   if(!(Test-Path $toc_folder))
   {
-    ni $toc_folder -type Directory
+    New-Item $toc_folder -type Directory
   }
 
-  copy (Join-Path $root_path "toc.yml") $toc_folder
+  Copy-Item (Join-Path $root_path "toc.yml") $toc_folder
 
   if(Join-Path $root_path "index.md" | Test-Path)
   {
-    copy (Join-Path $root_path "index.md") $toc_folder
+    Copy-Item (Join-Path $root_path "index.md") $toc_folder
   }
 }
 
@@ -50,16 +49,16 @@ Function UpdateGlobalToc
   param([string]$global_toc)
   if(!(Test-Path $global_toc))
   {
-    ni $global_toc
+    New-Item $global_toc
   }
-  if((gc $global_toc | Out-String) -notmatch $root_name)
+  if((Get-Content $global_toc | Out-String) -notmatch $root_name)
   {
-    ac $global_toc ("- name: " + $root_name)
+    Add-Content $global_toc ("- name: " + $root_name)
     if(Join-Path $root_path "index.md" | Test-Path)
     {
-      ac $global_toc ("  href: " + $root_name + "/index.md")
+      Add-Content $global_toc ("  href: " + $root_name + "/index.md")
     }
-    ac $global_toc ("  tocHref: " + $root_name + "/toc.yml")
+    Add-Content $global_toc ("  tocHref: " + $root_name + "/toc.yml")
   }
 }
 
@@ -67,12 +66,12 @@ Function UpdateBreadcrumb
 {
   param([string]$breadcrumb_path)
 
-  $breadcrumb = (gc -Raw $breadcrumb_path) | ConvertFrom-Json
+  $breadcrumb = (Get-Content -Raw $breadcrumb_path) | ConvertFrom-Json
   $children = $breadcrumb.children
   if($children -ne $null)
   {
     $new_node = $true
-    $children.children | ? {$_.href -match $root_name} | select -First 1 | % {$new_node = $false}
+    $children.children | ? {$_.href -match $root_name} | Select-Object -First 1 | % {$new_node = $false}
     if($new_node)
     {
       $new_child = New-Object PSObject -Property @{
@@ -90,20 +89,17 @@ Function UpdateBreadcrumb
         $children.children += $new_child
       }
       # powershell read json array(one object array) issue, have to insert array mark manually
-      sc $breadcrumb_path ('[' + ($breadcrumb | ConvertTo-Json -Depth 5) + ']') -NoNewline
+      Set-Content $breadcrumb_path ('[' + ($breadcrumb | ConvertTo-Json -Depth 5) + ']') -NoNewline
     }
   }
 }
 
-# Step 1. copy docs, toc and index page(if there is any) to processing repo
 echo "copy files ..."
 CopyFiles
 
-# Step 2: add current project to toc node if necessary
 echo "update global toc ..."
 UpdateGlobalToc (Join-Path $target_path "toc.yml")
 
-# Step 3. update breadcrumb if necessary
 echo "update breadcrumb ..."
 UpdateBreadcrumb (Join-Path $target_path "breadcrumb.json")
 
